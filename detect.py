@@ -3,13 +3,9 @@ import logging
 import argparse
 import warnings
 import numpy as np
-
-
 import torch
 import torch.nn.functional as F
 from torchvision import transforms
-
-
 from models import SCRFD
 from config import data_config
 from utils.helpers import get_model, draw_bbox_gaze
@@ -20,12 +16,12 @@ logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Gaze estimation inference")
-    parser.add_argument("--arch", type=str, default="resnet34", help="Model name, default `resnet18`")
+    parser.add_argument("--arch", type=str, default="resnet50", help="Model name, default `resnet18`")
     parser.add_argument(
         "--gaze-weights",
         type=str,
-        default="output/gaze360_resnet34_1724339168/best_model.pt",
-        help="Path to gaze esimation model weights"
+        default="resnet50.pt",
+        help="Path to gaze estimation model weights"
     )
     parser.add_argument(
         "--face-weights",
@@ -74,7 +70,7 @@ def main(params):
         face_detector = SCRFD(model_path=params.face_weights)
         logging.info("Face Detection model weights loaded.")
     except Exception as e:
-        logging.info(f"Exception occured while loading pre-trained weights of face detection model. Exception: {e}")
+        logging.info(f"Exception occurred while loading pre-trained weights of face detection model. Exception: {e}")
 
     try:
         gaze_detector = get_model(params.arch, params.bins, inference_mode=True)
@@ -82,7 +78,7 @@ def main(params):
         gaze_detector.load_state_dict(state_dict)
         logging.info("Gaze Estimation model weights loaded.")
     except Exception as e:
-        logging.info(f"Exception occured while loading pre-trained weights of gaze estimation model. Exception: {e}")
+        logging.info(f"Exception occurred while loading pre-trained weights of gaze estimation model. Exception: {e}")
 
     gaze_detector.to(device)
     gaze_detector.eval()
@@ -122,15 +118,12 @@ def main(params):
 
                 pitch_predicted, yaw_predicted = F.softmax(pitch, dim=1), F.softmax(yaw, dim=1)
 
-                # Mapping from binned (0 to 90) to angles (-180 to 180) or (0 to 28) to angles (-42, 42)
                 pitch_predicted = torch.sum(pitch_predicted * idx_tensor, dim=1) * params.binwidth - params.angle
                 yaw_predicted = torch.sum(yaw_predicted * idx_tensor, dim=1) * params.binwidth - params.angle
 
-                # Degrees to Radians
                 pitch_predicted = np.radians(pitch_predicted.cpu())
                 yaw_predicted = np.radians(yaw_predicted.cpu())
 
-                # draw box and gaze direction
                 draw_bbox_gaze(frame, bbox, pitch_predicted, yaw_predicted)
 
             if params.output:
@@ -151,6 +144,6 @@ if __name__ == "__main__":
     args = parse_args()
 
     if not args.view and not args.output:
-        raise Exception("At least one of --view or --ouput must be provided.")
+        raise Exception("At least one of --view or --output must be provided.")
 
     main(args)
